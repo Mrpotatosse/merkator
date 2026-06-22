@@ -1,0 +1,10 @@
+ktor:
+  deployment:
+    port: 8080
+  application:
+    modules:
+      - io.github.mrpotatosse.merkator.ApplicationKt.module
+db:
+  url: jdbc:sqlite:./data/merkator/data.db
+  migration: classpath:db/migration
+  drop: false
