@@ -41,12 +41,12 @@ class HiboukinMapService {
         elements: List<GraphicalElement>,
         normalElements: Map<Int, NormalGraphicalElementData>,
         gfx: Map<Int, ByteArray>,
-        offsetX: Int,
-        offsetY: Int,
+        offsetX: Float,
+        offsetY: Float,
     ): Picture {
         val recorder = PictureRecorder()
         val recordCanvas = recorder.beginRecording(
-            Rect.makeWH(CanvasWidth.toFloat(), CanvasHeight.toFloat())
+            Rect.makeWH(CanvasWidth, CanvasHeight.toFloat())
         )
 
         for (element in elements.sortedWith(
@@ -97,24 +97,33 @@ class HiboukinMapService {
         normalElements: Map<Int, NormalGraphicalElementData>,
         gfx: Map<Int, ByteArray>
     ): ByteArray {
-        val squareWidth = 1280
-        val squareHeight = 820
-        val x = (CanvasWidth - squareWidth) / 2
-        val y = (CanvasHeight - squareHeight) / 2
+        val squareWidth = CellWidth * MapWidth
+        val squareHeight = CellHeight * MapHeight
+        val x = (CanvasWidth - squareWidth) / 2f
+        val y = (CanvasHeight - squareHeight) / 2f
 
-        val surface = Surface.makeRasterN32Premul(CanvasWidth, CanvasHeight)
+        val surface = Surface.makeRasterN32Premul(CanvasWidth.toInt(), CanvasHeight)
         val canvas = surface.canvas
 
-        val picture = renderGraphicalElements(elements.flatten(), normalElements, gfx, x, 0)
-        canvas.drawPicture(picture)
-        picture.close()
+        for (layer in elements) {
+            val picture = renderGraphicalElements(layer, normalElements, gfx, x, 0f)
+            canvas.drawPicture(picture)
+            picture.close()
+            val first = layer.first()
+            if (first.layerId == 0) {
+                canvas.drawIsoGrid(IsoGridRenderer(), 1280, 1024, x, 0f)
+            }
+        }
 
         Paint().use { paint ->
             paint.color = Color.BLACK
             paint.mode = PaintMode.STROKE
             paint.strokeWidth = 1f
             canvas.drawRect(
-                Rect.makeXYWH(x.toFloat(), y.toFloat(), squareWidth.toFloat(), squareHeight.toFloat()),
+                Rect.makeLTRB(
+                    x, y,
+                    x + squareWidth, y + squareHeight,
+                ),
                 paint
             )
         }

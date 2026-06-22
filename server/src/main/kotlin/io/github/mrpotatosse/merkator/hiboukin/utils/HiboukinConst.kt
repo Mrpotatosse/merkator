@@ -16,6 +16,6 @@ const val MapHeight: Int = 20
 
 const val MapRatio = 16.0 / 9.0
 const val CanvasHeight = 1024
-const val CanvasWidth = (CanvasHeight * MapRatio).toInt()
+const val CanvasWidth = (CanvasHeight * MapRatio).toFloat()
 
 
