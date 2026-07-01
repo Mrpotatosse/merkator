@@ -1,19 +1,24 @@
 package io.github.mrpotatosse.merkator.hiboukin.entities.d2p
 
 import io.github.mrpotatosse.merkator.*
+import io.github.mrpotatosse.merkator.const.CellHalfHeight
+import io.github.mrpotatosse.merkator.const.CellHalfWidth
 import io.github.mrpotatosse.merkator.enumerations.ElementTypeEnum
 import io.github.mrpotatosse.merkator.enumerations.MapTypeEnum
 import io.github.mrpotatosse.merkator.extensions.*
 import io.github.mrpotatosse.merkator.hiboukin.models.D2pDataModel
-import io.github.mrpotatosse.merkator.hiboukin.utils.*
+import io.github.mrpotatosse.merkator.hiboukin.utils.DecryptionKeyBytes
 import io.github.mrpotatosse.merkator.projections.BaseColor
 import io.github.mrpotatosse.merkator.projections.BasePoint
+import io.github.mrpotatosse.merkator.utils.mapIdToKey
+import io.github.mrpotatosse.merkator.utils.packArgb
 import org.jetbrains.exposed.v1.core.dao.id.EntityID
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.dao.LongEntityClass
 import java.nio.ByteBuffer
 
 class MapEntity(id: EntityID<Long>) : D2pDataEntity(id) {
+
     companion object : LongEntityClass<MapEntity>(D2pDataModel) {
         fun findByMapId(id: UInt) = find { D2pDataModel.key eq mapIdToKey(id) }.single()
     }

@@ -3,7 +3,8 @@ package io.github.mrpotatosse.merkator.hiboukin.services
 import io.github.mrpotatosse.merkator.D2pMap
 import io.github.mrpotatosse.merkator.GraphicalElement
 import io.github.mrpotatosse.merkator.NormalGraphicalElementData
-import io.github.mrpotatosse.merkator.hiboukin.utils.*
+import io.github.mrpotatosse.merkator.const.*
+import io.github.mrpotatosse.merkator.hiboukin.utils.drawIsoGrid
 import org.jetbrains.skia.*
 
 class HiboukinMapService {
@@ -95,10 +96,11 @@ class HiboukinMapService {
     fun render(
         elements: List<List<GraphicalElement>>,
         normalElements: Map<Int, NormalGraphicalElementData>,
-        gfx: Map<Int, ByteArray>
+        gfx: Map<Int, ByteArray>,
+        gridLayer: Int
     ): ByteArray {
-        val squareWidth = CellWidth * MapWidth
-        val squareHeight = CellHeight * MapHeight
+        val squareWidth = ((CellWidth * MapWidth) + CellHalfWidth).toFloat()
+        val squareHeight = ((CellHeight * MapHeight) + CellHalfHeight)
         val x = (CanvasWidth - squareWidth) / 2f
         val y = (CanvasHeight - squareHeight) / 2f
 
@@ -110,10 +112,13 @@ class HiboukinMapService {
             canvas.drawPicture(picture)
             picture.close()
             val first = layer.first()
-            if (first.layerId == 0) {
-                canvas.drawIsoGrid(IsoGridRenderer(), 1280, 1024, x, 0f)
-            }
+            if (first.layerId == gridLayer)
+                canvas.drawIsoGrid(MapWidth, MapHeight, x, 0f)
+
         }
+
+        if (gridLayer > elements.size)
+            canvas.drawIsoGrid(MapWidth, MapHeight, x, 0f)
 
         Paint().use { paint ->
             paint.color = Color.BLACK
@@ -121,8 +126,8 @@ class HiboukinMapService {
             paint.strokeWidth = 1f
             canvas.drawRect(
                 Rect.makeLTRB(
-                    x, y,
-                    x + squareWidth, y + squareHeight,
+                    x, 0f,
+                    x + squareWidth, squareHeight,
                 ),
                 paint
             )

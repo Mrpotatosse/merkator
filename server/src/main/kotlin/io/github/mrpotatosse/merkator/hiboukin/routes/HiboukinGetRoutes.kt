@@ -10,6 +10,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.exposedLogger
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.koin.ktor.ext.inject
@@ -68,7 +69,9 @@ fun Route.hiboukinGetRoutes() {
         val mapId = call.parameters.getOrFail("id").toUInt()
         val withGround = call.queryParameters["ground"]?.toBoolean() ?: true
         val withDecor = call.queryParameters["decor"]?.toBoolean() ?: true
+        val gridLayer = call.queryParameters["gridLayer"]?.toInt() ?: 100
 
+        val startCom = System.currentTimeMillis()
         val (graphical, normals, gfx) = transaction {
             val map = MapEntity
                 .findByMapId(mapId)
@@ -91,7 +94,11 @@ fun Route.hiboukinGetRoutes() {
 
             Triple(graphicalElements, normalElements, elementsGfx)
         }
+        exposedLogger.info("computing took ${System.currentTimeMillis() - startCom}ms")
 
-        call.respond(mapService.render(graphical, normals, gfx))
+        val startRed = System.currentTimeMillis()
+        val imageBytes = mapService.render(graphical, normals, gfx, gridLayer)
+        exposedLogger.info("render took ${System.currentTimeMillis() - startRed}ms")
+        call.respond(imageBytes)
     }
 }

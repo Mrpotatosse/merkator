@@ -14,10 +14,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.painterResource
-
 import merkator.app.shared.generated.resources.Res
 import merkator.app.shared.generated.resources.compose_multiplatform
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 @Preview
@@ -44,6 +43,7 @@ fun App() {
                     Text("Compose: $greeting")
                 }
             }
+            DofusMap()
         }
     }
 }

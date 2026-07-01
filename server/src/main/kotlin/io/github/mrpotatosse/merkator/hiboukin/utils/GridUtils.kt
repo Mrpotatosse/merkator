@@ -1,87 +1,61 @@
 package io.github.mrpotatosse.merkator.hiboukin.utils
 
-import org.jetbrains.skia.Canvas
-import org.jetbrains.skia.Paint
-import kotlin.math.ceil
-import kotlin.math.floor
+import io.github.mrpotatosse.merkator.const.CellHalfHeight
+import io.github.mrpotatosse.merkator.const.CellHalfWidth
+import io.github.mrpotatosse.merkator.const.CellHeight
+import io.github.mrpotatosse.merkator.const.CellWidth
+import io.github.mrpotatosse.merkator.utils.worldToScreen
+import org.jetbrains.skia.*
 
-class IsoGridRenderer(
-    var tileWidth: Float = CellWidth.toFloat(),
-    var tileHeight: Float = CellHeight.toFloat(),
-) {
-
-    private val paint = Paint().apply {
-        isAntiAlias = true
-        color = 0xFF444444.toInt()
+fun Canvas.drawIsoGrid(width: Int, height: Int, rawOriginX: Float = 0f, rawOriginY: Float = 0f) {
+    val font = Font(FontMgr.default.matchFamily("Arial").getTypeface(0))
+    val paint = Paint().apply {
+        color = Color.WHITE
     }
 
-    private val majorPaint = Paint().apply {
-        isAntiAlias = true
-        color = 0xFF777777.toInt()
-    }
+    val originX = rawOriginX + CellHalfWidth
+    val originY = rawOriginY + CellHalfHeight
 
-    fun draw(
-        canvas: Canvas,
-        screenWidth: Int,
-        screenHeight: Int,
-        cameraX: Float,
-        cameraY: Float,
-        originX: Float,
-        originY: Float,
-        majorStep: Int = 10
-    ) {
-        // how many tiles we need to cover screen (overscan included)
-        val cols = (screenWidth / tileWidth).toInt() + 10
-        val rows = (screenHeight / tileHeight).toInt() + 10
+    var lines = arrayOf<Point>()
+    for (y in 0..<height * 2) {
+        for (x in 0..<width) {
+            val (startX, startY) = worldToScreen(
+                x.toFloat(),
+                y.toFloat(),
+                originX,
+                originY,
+                CellWidth.toFloat(),
+                CellHeight.toFloat()
+            )
+            val id = (y * width) + x
+            val textDiff = font.measureText("$id", paint)
+            drawString("$id", startX - (textDiff.width / 2f), startY + (textDiff.height / 2f), font, paint)
+            lines += arrayOf(
+                // l
+                Point(startX - CellHalfWidth, startY),
+                Point(startX, startY - CellHalfHeight),
 
-        fun worldToScreen(x: Float, y: Float): Pair<Float, Float> {
-            val sx = (x - y) * (tileWidth / 2f) + originX - cameraX
-            val sy = (x + y) * (tileHeight / 2f) + originY - cameraY
-            return sx to sy
+                // t
+                Point(startX, startY - CellHalfHeight),
+                Point(startX + CellHalfWidth, startY),
+            )
+            if (((y % 2 == 1) and (x == width - 1)) or (y == (height * 2) - 1)) {
+                // l fill
+                lines += arrayOf(
+                    Point(startX, startY + CellHalfHeight),
+                    Point(startX + CellHalfWidth, startY),
+                )
+            }
+            if (((y % 2 == 0) and (x == 0)) or (y == (height * 2) - 1)) {
+                // t fill
+                lines += arrayOf(
+                    Point(startX - CellHalfWidth, startY),
+                    Point(startX, startY + CellHalfHeight),
+                )
+            }
         }
-
-        // estimate visible world bounds (rough but works well)
-        val minX = floor((cameraX / tileWidth) - cols).toInt()
-        val maxX = ceil((cameraX / tileWidth) + cols).toInt()
-        val minY = floor((cameraY / tileHeight) - rows).toInt()
-        val maxY = ceil((cameraY / tileHeight) + rows).toInt()
-
-        // draw diagonal grid lines (isometric lattice)
-        for (i in minX..maxX) {
-            drawIsoLine(canvas, i, minY, i, maxY, ::worldToScreen, isMajor = (i % majorStep == 0))
-        }
-
-        for (j in minY..maxY) {
-            drawIsoLine(canvas, minX, j, maxX, j, ::worldToScreen, isMajor = (j % majorStep == 0))
-        }
     }
-
-    private fun drawIsoLine(
-        canvas: Canvas,
-        x1: Int,
-        y1: Int,
-        x2: Int,
-        y2: Int,
-        project: (Float, Float) -> Pair<Float, Float>,
-        isMajor: Boolean
-    ) {
-        val p = if (isMajor) majorPaint else paint
-
-        val (sx1, sy1) = project(x1.toFloat(), y1.toFloat())
-        val (sx2, sy2) = project(x2.toFloat(), y2.toFloat())
-
-        canvas.drawLine(sx1, sy1, sx2, sy2, p)
-    }
-}
-
-fun Canvas.drawIsoGrid(grid: IsoGridRenderer, width: Int, height: Int, originX: Float = 0f, originY: Float = 0f) {
-    grid.draw(
-        canvas = this,
-        screenWidth = width,
-        screenHeight = height,
-        cameraX = 0f,
-        cameraY = 0f,
-        originX = originX + (width / 2f),
-        originY = originY + (height / 2f),
+    drawLines(
+        lines, paint
     )
 }

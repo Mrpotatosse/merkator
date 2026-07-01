@@ -1,5 +1,7 @@
 package io.github.mrpotatosse.merkator.hiboukin.routes
 
+import io.github.mrpotatosse.merkator.const.AppHiboukinPathDefault
+import io.github.mrpotatosse.merkator.const.AppHiboukinPathKey
 import io.github.mrpotatosse.merkator.enumerations.GraphicalElementTypeEnum
 import io.github.mrpotatosse.merkator.extensions.deflate
 import io.github.mrpotatosse.merkator.extensions.extract
@@ -9,8 +11,6 @@ import io.github.mrpotatosse.merkator.hiboukin.models.EleDataModel
 import io.github.mrpotatosse.merkator.hiboukin.models.IsJpgModel
 import io.github.mrpotatosse.merkator.hiboukin.services.HiboukinFileReaderService
 import io.github.mrpotatosse.merkator.hiboukin.services.HiboukinFileService
-import io.github.mrpotatosse.merkator.hiboukin.utils.AppHiboukinPathDefault
-import io.github.mrpotatosse.merkator.hiboukin.utils.AppHiboukinPathKey
 import io.github.mrpotatosse.merkator.utils.AppInformation
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
