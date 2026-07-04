@@ -7,16 +7,15 @@ import io.github.mrpotatosse.merkator.hiboukin.entities.d2p.WorldGfxEntity
 import io.github.mrpotatosse.merkator.hiboukin.entities.ele.NormalEntity
 import io.github.mrpotatosse.merkator.hiboukin.models.D2pDataModel
 import io.github.mrpotatosse.merkator.hiboukin.services.HiboukinMapService
-import io.github.mrpotatosse.merkator.projections.FixtureElementDraw
-import io.github.mrpotatosse.merkator.projections.GraphicalElementDraw
-import io.github.mrpotatosse.merkator.projections.MapDrawInformation
-import io.github.mrpotatosse.merkator.projections.MapInformation
+import io.github.mrpotatosse.merkator.projections.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.skia.EncodedImageFormat
+import org.jetbrains.skia.Image
 import org.koin.ktor.ext.inject
 
 fun Route.hiboukinGetRoutes() {
@@ -38,8 +37,30 @@ fun Route.hiboukinGetRoutes() {
 
     get("/hiboukin/gfx") {
         val gfxId = call.parameters.getOrFail("id").toInt()
+        val quality = call.parameters["quality"]?.toInt() ?: 80
         call.respondBytes(transaction {
-            WorldGfxEntity.findById(gfxId).data.bytes
+            val image = Image.makeFromEncoded(WorldGfxEntity.findById(gfxId).data.bytes)
+            val data = image.encodeToData(EncodedImageFormat.WEBP, quality)!!
+            image.close()
+            data.bytes
+        })
+    }
+
+    get("/hiboukin/gfxs") {
+        val gfxIds = call.parameters.getOrFail("ids")
+            .split(",")
+            .map { it.trim().toInt() }
+            .toIntArray().toList()
+        val quality = call.parameters["quality"]?.toInt() ?: 80
+        call.respond(transaction {
+            val gfxs = WorldGfxEntity.findAllByGfxIdIn(gfxIds).mapValues { gfx ->
+                val image = Image.makeFromEncoded(gfx.value.data.bytes)
+                val data = image.encodeToData(EncodedImageFormat.WEBP, quality)!!
+                image.close()
+                data.bytes
+            }
+
+            MapGfxInformation(gfxs)
         })
     }
 

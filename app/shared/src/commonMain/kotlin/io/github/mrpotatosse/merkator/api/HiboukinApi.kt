@@ -1,6 +1,7 @@
 package io.github.mrpotatosse.merkator.api
 
 import io.github.mrpotatosse.merkator.projections.MapDrawInformation
+import io.github.mrpotatosse.merkator.projections.MapGfxInformation
 import io.github.mrpotatosse.merkator.projections.MapInformation
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -30,9 +31,17 @@ class HiboukinApi(
         }.body()
 
     /** GET /hiboukin/gfx?id=... — raw bytes */
-    suspend fun gfx(id: Int): ByteArray =
+    suspend fun gfx(id: Int, quality: Int = 80): ByteArray =
         client.get("$baseUrl/hiboukin/gfx") {
             parameter("id", id)
+            parameter("quality", quality)
+        }.body()
+
+    /** GET /hiboukin/gfxs?ids=... — raw bytes */
+    suspend fun gfxs(ids: List<Int>, quality: Int = 80): MapGfxInformation =
+        client.get("$baseUrl/hiboukin/gfxs") {
+            parameter("ids", ids.joinToString(","))
+            parameter("quality", quality)
         }.body()
 
     /** GET /hiboukin/draw/{id}?ground&decor&gfx */

@@ -29,9 +29,13 @@ import io.github.mrpotatosse.merkator.api.HiboukinApi
 import io.github.mrpotatosse.merkator.projections.*
 import io.github.mrpotatosse.merkator.utils.getIsoGridLines
 import io.github.mrpotatosse.merkator.utils.screenToWorld
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import org.jetbrains.skia.Image
+import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Clock
+import kotlin.time.Duration
 
 sealed interface MapState {
     data object Loading : MapState
@@ -50,7 +54,6 @@ data class BasicDrawWithBitmap(
     val bitmap: ImageBitmap
 )
 
-
 @Composable
 @Preview
 fun DofusMap() {
@@ -63,7 +66,9 @@ fun DofusMap() {
     var currentMapId by remember { mutableStateOf(191105026u) }
     var pointer by remember { mutableStateOf(Offset.Unspecified) }
     var serverOk by remember { mutableStateOf<Boolean?>(null) }
-    var mapState by remember { mutableStateOf<MapState>(MapState.Loading) }
+    var timeToRender by remember { mutableStateOf(Duration.ZERO) }
+    var withGrid by remember { mutableStateOf(true) }
+    //var mapState by remember { mutableStateOf<MapState>(MapState.Loading) }
     var mapDrawState by remember { mutableStateOf<MapDrawState>(MapDrawState.Loading) }
     var drawList by remember { mutableStateOf<List<List<BasicDrawWithBitmap>>>(emptyList()) }
 
@@ -76,11 +81,11 @@ fun DofusMap() {
     }
 
     LaunchedEffect(currentMapId) {
-        mapState = MapState.Loading
+        /*mapState = MapState.Loading
         mapState = runCatching { api.map(currentMapId) }.fold(
             onSuccess = { MapState.Ready(it) },
             onFailure = { MapState.Error(it.message ?: "unknown error") }
-        )
+        )*/
 
         mapDrawState = MapDrawState.Loading
         mapDrawState = runCatching { api.draw(currentMapId) }.fold(
@@ -91,30 +96,54 @@ fun DofusMap() {
 
     LaunchedEffect(mapDrawState) {
         drawList = emptyList()
-        val decoded = HashMap<Int, ImageBitmap>()
         when (val state = mapDrawState) {
             is MapDrawState.Ready -> {
                 drawList = withContext(Dispatchers.Default) {
-                    suspend fun bitmapFor(gfxId: Int): ImageBitmap? =
-                        decoded.getOrPut(gfxId) {
-                            val bytes = runCatching { api.gfx(gfxId) }
-                                .fold(
-                                    onSuccess = { b -> b },
-                                    onFailure = { null }
-                                ) ?: return null
-                            Image.makeFromEncoded(bytes).toComposeImageBitmap()
+                    val ids = state.info.elements.flatMap { elementDraws ->
+                        elementDraws.map { element ->
+                            when (element) {
+                                is FixtureElementDraw -> element.fixtureId
+                                is GraphicalElementDraw -> element.gfxId
+                            }
                         }
+                    }.distinct()
+
+                    val currentTime = Clock.System.now()
+                    val semaphore = Semaphore(16)
+                    val gfxs = coroutineScope {
+                        ids.chunked(16).map { chunk ->
+                            async {
+                                semaphore.withPermit {
+                                    try {
+                                        api.gfxs(chunk, 100).gfxs
+                                    } catch (e: CancellationException) {
+                                        throw e
+                                    } catch (_: Exception) {
+                                        emptyMap()
+                                    }
+                                }
+                            }
+                        }.awaitAll().fold(mutableMapOf<Int, ByteArray>()) { acc, m -> acc.apply { putAll(m) } }
+                    }
+                    timeToRender = Clock.System.now() - currentTime
+
                     state.info.elements.map { elementDraws ->
                         elementDraws.map { element ->
                             when (element) {
                                 is FixtureElementDraw -> {
-                                    val bitmap = bitmapFor(element.fixtureId) ?: return@map null
-                                    BasicDrawWithBitmap(element, bitmap)
+                                    val bytes = gfxs[element.fixtureId] ?: return@map null
+                                    BasicDrawWithBitmap(
+                                        element, Image.makeFromEncoded(bytes)
+                                            .toComposeImageBitmap()
+                                    )
                                 }
 
                                 is GraphicalElementDraw -> {
-                                    val bitmap = bitmapFor(element.gfxId) ?: return@map null
-                                    BasicDrawWithBitmap(element, bitmap)
+                                    val bytes = gfxs[element.gfxId] ?: return@map null
+                                    BasicDrawWithBitmap(
+                                        element, Image.makeFromEncoded(bytes)
+                                            .toComposeImageBitmap()
+                                    )
                                 }
                             }
                         }.filterNotNull()
@@ -150,7 +179,18 @@ fun DofusMap() {
                 }
         ) {
             translate(marginX, marginY) {
-                drawList.forEach { draws ->
+                drawList.forEachIndexed { index, draws ->
+                    if ((index == 2) and withGrid) {
+                        lines.forEach { (start, end) ->
+                            drawLine(
+                                color = Color.Gray,
+                                start = Offset(start.first, start.second),
+                                end = Offset(end.first, end.second),
+                                strokeWidth = 1f
+                            )
+                        }
+                    }
+
                     draws.forEach { draw ->
                         when (draw.elementDraw) {
                             is FixtureElementDraw -> {
@@ -227,15 +267,6 @@ fun DofusMap() {
                         }
                     }
                 }
-
-                lines.forEach { (start, end) ->
-                    drawLine(
-                        color = Color.Gray,
-                        start = Offset(start.first, start.second),
-                        end = Offset(end.first, end.second),
-                        strokeWidth = 1f
-                    )
-                }
             }
         }
 
@@ -245,13 +276,14 @@ fun DofusMap() {
             originY = marginY + cellHeight / 2f,
             cellWidth = cellWidth.toFloat(),
             cellHeight = cellHeight.toFloat(),
+            timeToRender = timeToRender,
             serverOk = serverOk,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(8.dp)
         )
 
-        MapInfoPanel(
+        /*MapInfoPanel(
             mapState = mapState,
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -265,7 +297,7 @@ fun DofusMap() {
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(8.dp)
-        )
+        ) */
     }
 }
 
@@ -276,6 +308,7 @@ fun InfoWatcher(
     originY: Float,
     cellWidth: Float,
     cellHeight: Float,
+    timeToRender: Duration,
     serverOk: Boolean?,
     modifier: Modifier = Modifier
 ) {
@@ -290,6 +323,10 @@ fun InfoWatcher(
             false -> "server: DOWN"
         }
         Text(status, color = Color.White, fontSize = 12.sp)
+        Text(
+            "time to render: $timeToRender",
+            color = Color.White, fontSize = 12.sp
+        )
 
         if (pointer.isSpecified) {
             val (worldX, worldY) = screenToWorld(
