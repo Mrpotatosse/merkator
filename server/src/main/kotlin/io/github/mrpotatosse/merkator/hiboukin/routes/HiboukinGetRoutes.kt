@@ -1,16 +1,20 @@
 package io.github.mrpotatosse.merkator.hiboukin.routes
 
+import io.github.mrpotatosse.merkator.const.*
+import io.github.mrpotatosse.merkator.enumerations.GraphicalElementTypeEnum
 import io.github.mrpotatosse.merkator.hiboukin.entities.d2p.MapEntity
 import io.github.mrpotatosse.merkator.hiboukin.entities.d2p.WorldGfxEntity
 import io.github.mrpotatosse.merkator.hiboukin.entities.ele.NormalEntity
 import io.github.mrpotatosse.merkator.hiboukin.models.D2pDataModel
 import io.github.mrpotatosse.merkator.hiboukin.services.HiboukinMapService
+import io.github.mrpotatosse.merkator.projections.FixtureElementDraw
+import io.github.mrpotatosse.merkator.projections.GraphicalElementDraw
+import io.github.mrpotatosse.merkator.projections.MapDrawInformation
 import io.github.mrpotatosse.merkator.projections.MapInformation
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.util.*
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.exposedLogger
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.koin.ktor.ext.inject
@@ -32,6 +36,86 @@ fun Route.hiboukinGetRoutes() {
         })
     }
 
+    get("/hiboukin/gfx") {
+        val gfxId = call.parameters.getOrFail("id").toInt()
+        call.respondBytes(transaction {
+            WorldGfxEntity.findById(gfxId).data.bytes
+        })
+    }
+
+    get("/hiboukin/draw/{id}") {
+        val mapId = call.parameters.getOrFail("id").toUInt()
+        val withGround = call.queryParameters["ground"]?.toBoolean() ?: true
+        val withDecor = call.queryParameters["decor"]?.toBoolean() ?: true
+
+        call.respond(transaction {
+            val map = MapEntity
+                .findByMapId(mapId)
+                .getMap()
+
+            val graphicalElements = mapService
+                .elements(map, withGround, withDecor)
+
+            val normalElements = graphicalElements
+                .flatMap { elements ->
+                    NormalEntity
+                        .findAllByElementIdInAndTypeIn(
+                            elements
+                                .map { element -> element.elementId.toInt() }, listOf(GraphicalElementTypeEnum.NORMAL)
+                        )
+                        .map { normal -> normal.getData() }
+                }
+                .associateBy { it.id }
+
+            val elements = graphicalElements.map { elements ->
+                elements.map { element ->
+                    val normal = normalElements[element.elementId.toInt()] ?: return@map null
+
+                    val col = element.cellId % MapWidth
+                    val row = element.cellId / MapWidth
+                    val cellX = col * CellWidth + if (row % 2 == 1) CellHalfWidth.toDouble() else 0.0
+                    val cellY = row * CellHalfHeight
+
+                    val dataX = -normal.origin.x + (CellHalfWidth + element.offset.x)
+                    val dataY = -normal.origin.y + (CellHalfHeight - element.altitude * 10.0 + element.offset.y)
+
+                    GraphicalElementDraw(
+                        gfxId = normal.gfxId,
+                        x = (cellX + dataX).toFloat(),
+                        y = (cellY + dataY).toFloat(),
+                        width = normal.size.x.toInt(),
+                        height = normal.size.y.toInt(),
+                        flipped = normal.horizontalSymmetry,
+                    )
+                }.filterNotNull()
+            }
+
+            val backgrounds = map.background.map { fixture ->
+                FixtureElementDraw(
+                    fixtureId = fixture.fixtureId,
+                    x = fixture.offset.x.toFloat() + CellHalfWidth,
+                    y = fixture.offset.y.toFloat() + CellHeight,
+                    rotation = fixture.rotation,
+                    scale = fixture.scale,
+                    color = fixture.color,
+                )
+            }
+
+            val foregrounds = map.foreground.map { fixture ->
+                FixtureElementDraw(
+                    fixtureId = fixture.fixtureId,
+                    x = fixture.offset.x.toFloat() + CellHalfWidth,
+                    y = fixture.offset.y.toFloat() + CellHeight,
+                    rotation = fixture.rotation,
+                    scale = fixture.scale,
+                    color = fixture.color,
+                )
+            }
+
+            MapDrawInformation(listOf(backgrounds, *elements.toTypedArray(), foregrounds))
+        })
+    }
+
     get("/hiboukin/map/{id}") {
         val mapId = call.parameters.getOrFail("id").toUInt()
         val withGround = call.queryParameters["ground"]?.toBoolean() ?: true
@@ -48,7 +132,7 @@ fun Route.hiboukinGetRoutes() {
                 }
                 .flatMap { elements ->
                     NormalEntity
-                        .findAllByElementIdIn(elements)
+                        .findAllByElementIdInAndTypeIn(elements, listOf(GraphicalElementTypeEnum.NORMAL))
                         .map { normal -> normal.getData() }
                 }
                 .associateBy { it.id }
@@ -65,7 +149,7 @@ fun Route.hiboukinGetRoutes() {
         })
     }
 
-    get("/hiboukin/map/{id}/render") {
+    /* get("/hiboukin/map/{id}/render") {
         val mapId = call.parameters.getOrFail("id").toUInt()
         val withGround = call.queryParameters["ground"]?.toBoolean() ?: true
         val withDecor = call.queryParameters["decor"]?.toBoolean() ?: true
@@ -100,5 +184,5 @@ fun Route.hiboukinGetRoutes() {
         val imageBytes = mapService.render(graphical, normals, gfx, gridLayer)
         exposedLogger.info("render took ${System.currentTimeMillis() - startRed}ms")
         call.respond(imageBytes)
-    }
+    } */
 }

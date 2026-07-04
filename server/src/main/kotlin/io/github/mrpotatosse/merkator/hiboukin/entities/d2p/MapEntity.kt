@@ -226,7 +226,7 @@ class MapEntity(id: EntityID<Long>) : D2pDataEntity(id) {
                 val rShadow = buffer.readByte()
                 val gShadow = buffer.readByte()
                 val bShadow = buffer.readByte()
-                val pixelOffsetX = if (mapVersion <= 4) (buffer.readByte() * CellHalfWidth).toShort()
+                val pixelOffsetX = if (mapVersion <= 4) (buffer.readByte() * CellHalfWidth).toInt().toShort()
                 else buffer.readShort()
                 val pixelOffsetY = if (mapVersion <= 4) (buffer.readByte() * CellHalfHeight).toInt().toShort()
                 else buffer.readShort()

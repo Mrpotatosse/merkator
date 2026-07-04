@@ -4,7 +4,7 @@ const val AppHiboukinPathKey = "app_hiboukin_path"
 const val AppHiboukinPathDefault = "default"
 
 const val CellWidth = 86
-const val CellHalfWidth = 43
+const val CellHalfWidth = 43f
 const val CellHeight = 43
 const val CellHalfHeight = 21.5f
 

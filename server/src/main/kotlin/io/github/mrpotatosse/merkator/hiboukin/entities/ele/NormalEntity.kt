@@ -1,12 +1,14 @@
 package io.github.mrpotatosse.merkator.hiboukin.entities.ele
 
 import io.github.mrpotatosse.merkator.NormalGraphicalElementData
+import io.github.mrpotatosse.merkator.enumerations.GraphicalElementTypeEnum
 import io.github.mrpotatosse.merkator.extensions.readBoolean
 import io.github.mrpotatosse.merkator.extensions.readByte
 import io.github.mrpotatosse.merkator.extensions.readInt
 import io.github.mrpotatosse.merkator.extensions.readShort
 import io.github.mrpotatosse.merkator.hiboukin.models.EleDataModel
 import io.github.mrpotatosse.merkator.projections.BasePoint
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.dao.id.EntityID
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.dao.LongEntityClass
@@ -19,6 +21,8 @@ open class NormalEntity(id: EntityID<Long>) : EleDataEntity(id) {
 
     companion object : LongEntityClass<NormalEntity>(EleDataModel) {
         fun findAllByElementIdIn(elementIds: Collection<Int>) = find { EleDataModel.elementId inList elementIds }
+        fun findAllByElementIdInAndTypeIn(elementIds: Collection<Int>, types: Collection<GraphicalElementTypeEnum>) =
+            find { (EleDataModel.elementId inList elementIds) and (EleDataModel.elementType inList types) }
     }
 
     fun <T> typedData(

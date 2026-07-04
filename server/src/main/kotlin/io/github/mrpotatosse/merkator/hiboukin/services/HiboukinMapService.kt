@@ -25,18 +25,17 @@ class HiboukinMapService {
         withGround: Boolean = true,
         withDecor: Boolean = true,
         mapper: (GraphicalElement) -> T
-    ) =
-        map
-            .layers
-            .map { layer ->
-                if ((layer.layerId == 0) and !withGround) emptyList()
-                else if ((layer.layerId == 2) and !withDecor) emptyList()
-                else layer
-                    .cells
-                    .flatMap { cell -> cell.elements }
-                    .filterIsInstance<GraphicalElement>()
-                    .map(mapper)
-            }.filter { elements -> elements.isNotEmpty() }
+    ) = map
+        .layers
+        .map { layer ->
+            if ((layer.layerId == 0) and !withGround) emptyList()
+            else if ((layer.layerId == 2) and !withDecor) emptyList()
+            else layer
+                .cells
+                .flatMap { cell -> cell.elements }
+                .filterIsInstance<GraphicalElement>()
+                .map(mapper)
+        }.filter { elements -> elements.isNotEmpty() }.toTypedArray()
 
     fun renderGraphicalElements(
         elements: List<GraphicalElement>,

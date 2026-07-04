@@ -10,3 +10,8 @@ data class MapInformation(
     val elements: Map<Int, NormalGraphicalElementData>,
     val elementsGfx: Map<Int, ByteArray>
 )
+
+@Serializable
+data class MapDrawInformation(
+    val elements: List<List<BasicDraw>>
+)

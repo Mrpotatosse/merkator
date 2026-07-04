@@ -4,6 +4,7 @@ import io.github.mrpotatosse.merkator.hiboukin.models.D2pDataModel
 import io.github.mrpotatosse.merkator.utils.gfxIdToKey
 import io.github.mrpotatosse.merkator.utils.keyToGfxId
 import org.jetbrains.exposed.v1.core.dao.id.EntityID
+import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.dao.LongEntityClass
 
@@ -12,5 +13,9 @@ class WorldGfxEntity(id: EntityID<Long>) : D2pDataEntity(id) {
         fun findAllByGfxIdIn(elementIds: Collection<Int>): Map<Int, WorldGfxEntity> =
             find { D2pDataModel.key inList elementIds.map(::gfxIdToKey) }
                 .associateBy { keyToGfxId(it.key) }
+
+        fun findById(id: Int): WorldGfxEntity =
+            find { D2pDataModel.key eq gfxIdToKey(id) }
+                .single()
     }
 }
