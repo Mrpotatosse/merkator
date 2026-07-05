@@ -1,9 +1,9 @@
 package io.github.mrpotatosse.merkator.hiboukin.entities.ele
 
-import io.github.mrpotatosse.merkator.EntityGraphicalElementData
 import io.github.mrpotatosse.merkator.extensions.readBoolean
 import io.github.mrpotatosse.merkator.extensions.readInt
 import io.github.mrpotatosse.merkator.extensions.readUTFBytes
+import io.github.mrpotatosse.merkator.projections.EntityGraphicalElementData
 import org.jetbrains.exposed.v1.core.dao.id.EntityID
 
 class EntityEntity(id: EntityID<Long>) : EleDataEntity(id) {

@@ -1,8 +1,8 @@
 package io.github.mrpotatosse.merkator.hiboukin.entities.ele
 
-import io.github.mrpotatosse.merkator.BlendedGraphicalElementData
 import io.github.mrpotatosse.merkator.extensions.readInt
 import io.github.mrpotatosse.merkator.extensions.readUTFBytes
+import io.github.mrpotatosse.merkator.projections.BlendedGraphicalElementData
 import org.jetbrains.exposed.v1.core.dao.id.EntityID
 
 class BlendedEntity(id: EntityID<Long>) : NormalEntity(id) {

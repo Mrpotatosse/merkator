@@ -1,12 +1,9 @@
-package io.github.mrpotatosse.merkator
+package io.github.mrpotatosse.merkator.projections
 
 import io.github.mrpotatosse.merkator.enumerations.MapTypeEnum
-import io.github.mrpotatosse.merkator.projections.BaseColor
-import io.github.mrpotatosse.merkator.projections.BasePoint
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonClassDiscriminator
 
 @Serializable
 data class D2pMap(
@@ -82,7 +79,6 @@ data class Cell(
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-@JsonClassDiscriminator("type")
 sealed class BasicElement
 
 @Serializable

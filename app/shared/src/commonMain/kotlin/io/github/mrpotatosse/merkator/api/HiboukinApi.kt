@@ -5,18 +5,22 @@ import io.github.mrpotatosse.merkator.projections.MapGfxInformation
 import io.github.mrpotatosse.merkator.projections.MapInformation
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.compression.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.json.Json
+import io.ktor.serialization.kotlinx.protobuf.*
+import kotlinx.serialization.ExperimentalSerializationApi
 
 // shared/commonMain/kotlin/api/HiboukinApi.kt
-class HiboukinApi(
+class HiboukinApi @OptIn(ExperimentalSerializationApi::class) constructor(
     private val baseUrl: String,
     private val client: HttpClient = HttpClient {
+        install(ContentEncoding) {
+            gzip()
+        }
         install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true })
+            protobuf()
         }
     }
 ) {

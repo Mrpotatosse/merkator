@@ -1,10 +1,10 @@
 package io.github.mrpotatosse.merkator.hiboukin.services
 
-import io.github.mrpotatosse.merkator.D2pMap
-import io.github.mrpotatosse.merkator.GraphicalElement
-import io.github.mrpotatosse.merkator.NormalGraphicalElementData
 import io.github.mrpotatosse.merkator.const.*
 import io.github.mrpotatosse.merkator.hiboukin.utils.drawIsoGrid
+import io.github.mrpotatosse.merkator.projections.D2pMap
+import io.github.mrpotatosse.merkator.projections.GraphicalElement
+import io.github.mrpotatosse.merkator.projections.NormalGraphicalElementData
 import org.jetbrains.skia.*
 
 class HiboukinMapService {

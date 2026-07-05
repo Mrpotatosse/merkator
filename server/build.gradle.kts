@@ -41,8 +41,9 @@ dependencies {
     implementation(libs.ktor.server.cors)
     implementation(libs.ktor.server.websockets)
     implementation(libs.ktor.server.config.yaml)
+    implementation(libs.ktor.server.compression)
     implementation(libs.ktor.server.content.negotiation)
-    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.ktor.serialization.kotlinx.protobuf)
 
     implementation(libs.koin.ktor)
     implementation(libs.koin.logger.slf4j)
@@ -54,7 +55,7 @@ dependencies {
     implementation(libs.exposed.migration.core)
     implementation(libs.exposed.migration.jdbc)
     implementation(libs.sqlite.jdbc)
-    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.serialization.protobuf)
 
     // Source: https://mvnrepository.com/artifact/org.jetbrains.skiko/skiko
     implementation(libs.skiko)

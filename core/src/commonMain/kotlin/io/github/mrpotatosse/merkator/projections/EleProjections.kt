@@ -1,14 +1,11 @@
-package io.github.mrpotatosse.merkator
+package io.github.mrpotatosse.merkator.projections
 
-import io.github.mrpotatosse.merkator.projections.BasePoint
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonClassDiscriminator
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-@JsonClassDiscriminator("type")
 sealed class GraphicalElementData
 
 @Serializable

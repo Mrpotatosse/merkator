@@ -30,14 +30,15 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
-            implementation(libs.ktor.serialization.kotlinx.json)
+            implementation(libs.ktor.client.encoding)
+            implementation(libs.ktor.serialization.kotlinx.protobuf)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
         jsMain.dependencies {
             implementation(libs.wrappers.browser)
-            implementation(libs.ktor.client.js)
+            implementation(libs.ktor.client.encoding)
         }
         wasmJsMain.dependencies {
             implementation(libs.ktor.client.js)

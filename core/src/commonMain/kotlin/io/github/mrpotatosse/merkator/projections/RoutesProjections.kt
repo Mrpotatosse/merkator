@@ -1,7 +1,5 @@
 package io.github.mrpotatosse.merkator.projections
 
-import io.github.mrpotatosse.merkator.D2pMap
-import io.github.mrpotatosse.merkator.NormalGraphicalElementData
 import kotlinx.serialization.Serializable
 
 @Serializable
