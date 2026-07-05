@@ -11,13 +11,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.isSpecified
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.tooling.preview.Preview
@@ -26,23 +24,23 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.mrpotatosse.merkator.api.HiboukinApi
-import io.github.mrpotatosse.merkator.projections.*
-import io.github.mrpotatosse.merkator.utils.getIsoGridLines
-import io.github.mrpotatosse.merkator.utils.screenToWorld
-import io.github.mrpotatosse.merkator.utils.tintFilter
+import io.github.mrpotatosse.merkator.const.CellHalfHeight
+import io.github.mrpotatosse.merkator.const.CellHalfWidth
+import io.github.mrpotatosse.merkator.const.MapWidth
+import io.github.mrpotatosse.merkator.projections.BasicDraw
+import io.github.mrpotatosse.merkator.projections.FixtureElementDraw
+import io.github.mrpotatosse.merkator.projections.GraphicalElementDraw
+import io.github.mrpotatosse.merkator.projections.MapDrawInformation
+import io.github.mrpotatosse.merkator.utils.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.Image
+import org.jetbrains.skia.ImageInfo
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
 import kotlin.time.Duration
-
-sealed interface MapState {
-    data object Loading : MapState
-    data class Ready(val info: MapInformation) : MapState
-    data class Error(val message: String) : MapState
-}
 
 sealed interface MapDrawState {
     data object Loading : MapDrawState
@@ -55,6 +53,30 @@ data class BasicDrawWithBitmap(
     val bitmap: ImageBitmap
 )
 
+fun DrawScope.drawMapCellFromCoord(
+    x: Float,
+    y: Float,
+    originX: Float,
+    originY: Float,
+    cellWidth: Float,
+    cellHeight: Float,
+    color: Color = Color.Gray,
+    style: DrawStyle = Stroke(width = 1f),
+) {
+    val (startX, startY) = worldToScreen(x, y, originX, originY, cellWidth, cellHeight)
+    val cellHalfWidth = cellWidth / 2.0f
+    val cellHalfHeight = cellHeight / 2.0f
+    // losange iso : les 4 sommets de la cellule
+    val path = Path().apply {
+        moveTo(startX + cellHalfWidth, startY)
+        lineTo(startX, startY + cellHalfHeight)
+        lineTo(startX - cellHalfWidth, startY)
+        lineTo(startX, startY - cellHalfHeight)       // bas
+        close()
+    }
+    drawPath(path, color, style = style)
+}
+
 @Composable
 @Preview
 fun DofusMap() {
@@ -64,14 +86,28 @@ fun DofusMap() {
     val mapWidth = 14
     val mapHeight = 20
     // zaap astrub : 191105026
+    // map eleveur : 73403912
     var currentMapId by remember { mutableStateOf(191105026u) }
     var pointer by remember { mutableStateOf(Offset.Unspecified) }
     var serverOk by remember { mutableStateOf<Boolean?>(null) }
     var timeToRender by remember { mutableStateOf(Duration.ZERO) }
     var withGrid by remember { mutableStateOf(true) }
-    //var mapState by remember { mutableStateOf<MapState>(MapState.Loading) }
     var mapDrawState by remember { mutableStateOf<MapDrawState>(MapDrawState.Loading) }
     var drawList by remember { mutableStateOf<List<List<BasicDrawWithBitmap>>>(emptyList()) }
+
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+    var marginX by remember { mutableStateOf(0f) }
+    var marginY by remember { mutableStateOf(0f) }
+    val mapCell = remember(pointer, marginX, marginY) {
+        screenToWorld(
+            screenX = pointer.x,
+            screenY = pointer.y,
+            originX = marginX,
+            originY = marginY,
+            cellW = cellWidth.toFloat(),
+            cellH = cellHeight.toFloat(),
+        )
+    }
 
     val lines = remember(mapWidth, mapHeight, cellWidth, cellHeight) {
         getIsoGridLines(mapWidth, mapHeight, cellWidth, cellHeight)
@@ -82,12 +118,6 @@ fun DofusMap() {
     }
 
     LaunchedEffect(currentMapId) {
-        /*mapState = MapState.Loading
-        mapState = runCatching { api.map(currentMapId) }.fold(
-            onSuccess = { MapState.Ready(it) },
-            onFailure = { MapState.Error(it.message ?: "unknown error") }
-        )*/
-
         mapDrawState = MapDrawState.Loading
         mapDrawState = runCatching { api.draw(currentMapId) }.fold(
             onSuccess = { MapDrawState.Ready(it) },
@@ -99,6 +129,7 @@ fun DofusMap() {
         drawList = emptyList()
         when (val state = mapDrawState) {
             is MapDrawState.Ready -> {
+                val currentTime = Clock.System.now()
                 drawList = withContext(Dispatchers.Default) {
                     val ids = state.info.elements.flatMap { elementDraws ->
                         elementDraws.map { element ->
@@ -108,15 +139,13 @@ fun DofusMap() {
                             }
                         }
                     }.distinct()
-
-                    val currentTime = Clock.System.now()
                     val semaphore = Semaphore(16)
                     val gfxs = coroutineScope {
                         ids.chunked(16).map { chunk ->
                             async {
                                 semaphore.withPermit {
                                     try {
-                                        api.gfxs(chunk, 100).gfxs
+                                        api.gfxs(chunk).gfxs
                                     } catch (e: CancellationException) {
                                         throw e
                                     } catch (_: Exception) {
@@ -126,73 +155,280 @@ fun DofusMap() {
                             }
                         }.awaitAll().fold(mutableMapOf<Int, ByteArray>()) { acc, m -> acc.apply { putAll(m) } }
                     }
-                    timeToRender = Clock.System.now() - currentTime
+
+                    val bitmaps: Map<Int, ImageBitmap> = coroutineScope {
+                        gfxs.map { (id, bytes) ->
+                            async(Dispatchers.Default) {
+                                val img = Image.makeFromEncoded(bytes)
+                                val bitmap = Bitmap().apply {
+                                    allocPixels(ImageInfo.makeN32Premul(img.width, img.height))
+                                }
+                                img.readPixels(bitmap, 0, 0)  // forces the decode now, off the UI thread
+                                val composeBitmap = bitmap.asComposeImageBitmap()
+
+                                id to composeBitmap
+                            }
+                        }.awaitAll().toMap()
+                    }
 
                     state.info.elements.map { elementDraws ->
-                        elementDraws.map { element ->
-                            when (element) {
-                                is FixtureElementDraw -> {
-                                    val bytes = gfxs[element.fixtureId] ?: return@map null
-                                    BasicDrawWithBitmap(
-                                        element, Image.makeFromEncoded(bytes)
-                                            .toComposeImageBitmap()
-                                    )
-                                }
-
-                                is GraphicalElementDraw -> {
-                                    val bytes = gfxs[element.gfxId] ?: return@map null
-                                    BasicDrawWithBitmap(
-                                        element, Image.makeFromEncoded(bytes)
-                                            .toComposeImageBitmap()
-                                    )
-                                }
+                        elementDraws.mapNotNull { element ->
+                            val id = when (element) {
+                                is FixtureElementDraw -> element.fixtureId
+                                is GraphicalElementDraw -> element.gfxId
                             }
-                        }.filterNotNull()
+                            bitmaps[id]?.let { BasicDrawWithBitmap(element, it) }
+                        }
                     }
                 }
+                timeToRender = Clock.System.now() - currentTime
             }
 
             else -> {}
         }
     }
-
     Box(Modifier.fillMaxSize()) {
         val virtualWidth = 1280f
         val virtualHeight = 1024f
 
-        var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-
-        // computed once at the composable level, usable everywhere
-        val marginX = ((canvasSize.width - virtualWidth) / 2f).coerceAtLeast(0f)
-        val marginY = ((canvasSize.height - virtualHeight) / 2f).coerceAtLeast(0f)
-
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .onSizeChanged { canvasSize = it }
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            pointer = event.changes.first().position
-                        }
-                    }
-                }
-        ) {
-            translate(marginX, marginY) {
+        when (val state = mapDrawState) {
+            is MapDrawState.Ready -> {
+                val baseColor = unpackArgb(state.info.d2p.color.grid)
+                val gridColor = Color(baseColor.red, baseColor.green, baseColor.blue, baseColor.alpha)
                 drawList.forEachIndexed { index, draws ->
                     if ((index == 2) and withGrid) {
-                        lines.forEach { (start, end) ->
-                            drawLine(
-                                color = Color.Gray,
-                                start = Offset(start.first, start.second),
-                                end = Offset(end.first, end.second),
-                                strokeWidth = 1f
-                            )
-                        }
+                        GridCanvas(
+                            gridLinesProvider = { lines },
+                            gridLinesColor = gridColor,
+                            transformBlock = { translate(marginX, marginY) }
+                        )
                     }
 
-                    draws.forEach { draw ->
+                    ElementsCanvas(
+                        drawsProvider = { draws },
+                        transformBlock = {
+                            translate(marginX, marginY)
+                        }
+                    )
+                }
+                /* Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                ) {
+                    withTransform({
+                    }) {
+                        drawList.forEachIndexed { index, draws ->
+                            if ((index == 2) and withGrid) {
+                                lines.forEach { (start, end) ->
+                                    val baseColor = unpackArgb(state.info.d2p.color.grid)
+                                    drawLine(
+                                        color = Color(baseColor.red, baseColor.green, baseColor.blue, baseColor.alpha),
+                                        start = Offset(start.first, start.second),
+                                        end = Offset(end.first, end.second),
+                                        strokeWidth = 1f
+                                    )
+                                }
+                            }
+
+                            draws.forEach { draw ->
+                                when (draw.elementDraw) {
+                                    is FixtureElementDraw -> {
+                                        val w = draw.bitmap.width
+                                        val h = draw.bitmap.height
+                                        val halfW = w * 0.5f
+                                        val halfH = h * 0.5f
+                                        val colorFilter = tintFilter(
+                                            draw.elementDraw.color.getR(),
+                                            draw.elementDraw.color.getG(),
+                                            draw.elementDraw.color.getB(),
+                                            draw.elementDraw.color.getA()
+                                        )
+
+                                        val posX = draw.elementDraw.x + halfW
+                                        val posY = draw.elementDraw.y + halfH
+
+                                        withTransform({
+                                            translate(
+                                                posX,
+                                                posY
+                                            )
+                                            rotate(
+                                                degrees = draw.elementDraw.rotation / 100f,
+                                                pivot = Offset.Zero
+                                            )
+                                            scale(
+                                                draw.elementDraw.scale.x / 1000f,
+                                                draw.elementDraw.scale.y / 1000f,
+                                                pivot = Offset.Zero
+                                            )
+                                            translate(
+                                                -halfW,
+                                                -halfH
+                                            )
+                                        }) {
+                                            drawImage(
+                                                image = draw.bitmap,
+                                                dstOffset = IntOffset.Zero,
+                                                dstSize = IntSize(w, h),
+                                                colorFilter = colorFilter
+                                            )
+                                        }
+                                    }
+
+                                    is GraphicalElementDraw -> {
+                                        val size = IntSize(
+                                            draw.elementDraw.width,
+                                            draw.elementDraw.height
+                                        )
+                                        val offset = IntOffset(
+                                            draw.elementDraw.x.toInt(),
+                                            draw.elementDraw.y.toInt()
+                                        )
+                                        val colorFilter = tintFilter(
+                                            draw.elementDraw.r,
+                                            draw.elementDraw.g,
+                                            draw.elementDraw.b
+                                        )
+
+                                        if (draw.elementDraw.flipped) {
+                                            withTransform({
+                                                scale(
+                                                    -1f,
+                                                    1f,
+                                                    pivot = Offset(draw.elementDraw.x + draw.elementDraw.width / 2f, 0f)
+                                                )
+                                            }) {
+                                                drawImage(
+                                                    image = draw.bitmap,
+                                                    dstSize = size,
+                                                    dstOffset = offset,
+                                                    colorFilter = colorFilter
+                                                )
+                                            }
+                                        } else {
+                                            drawImage(
+                                                image = draw.bitmap,
+                                                dstSize = size,
+                                                dstOffset = offset,
+                                                colorFilter = colorFilter
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } */
+
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .onSizeChanged {
+                            canvasSize = it
+
+                            marginX = ((canvasSize.width - virtualWidth) / 2f).coerceAtLeast(0f)
+                            marginY = ((canvasSize.height - virtualHeight) / 2f).coerceAtLeast(0f)
+                        }
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    pointer = event.changes.first().position
+                                }
+                            }
+                        }
+                ) {
+                    withTransform({ translate(marginX, marginY) }) {
+                        drawMapCellFromCoord(
+                            mapCell.first, mapCell.second,
+                            0f, 0f,
+                            cellWidth.toFloat(), cellHeight.toFloat(),
+                            color = Color.Red.copy(alpha = 0.4f),
+                            style = Fill
+                        )
+
+                        state.info.d2p.cells.forEach { cell ->
+                            if (!cell.mov)
+                                drawMapCellFromCoord(
+                                    (cell.id % MapWidth).toFloat(), (cell.id / MapWidth).toFloat(),
+                                    CellHalfWidth, CellHalfHeight,
+                                    cellWidth.toFloat(), cellHeight.toFloat(),
+                                    color = Color.Black.copy(alpha = 0.4f),
+                                    style = Fill
+                                )
+                        }
+                    }
+                    if (pointer.isSpecified) drawCircle(Color.Green, 6f, pointer)
+                }
+
+                InfoWatcher(
+                    pointer = pointer,
+                    originX = marginX + cellWidth / 2f,
+                    originY = marginY + cellHeight / 2f,
+                    cellWidth = cellWidth.toFloat(),
+                    cellHeight = cellHeight.toFloat(),
+                    timeToRender = timeToRender,
+                    serverOk = serverOk,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(8.dp)
+                )
+
+                MapController(
+                    currentMapId = currentMapId,
+                    onNavigate = { currentMapId = it },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                )
+            }
+
+            else -> {}
+        }
+    }
+}
+
+@Composable
+fun GridCanvas(
+    gridLinesProvider: () -> List<List<Pair<Float, Float>>>,
+    gridLinesColor: Color = Color.White,
+    transformBlock: DrawTransform.() -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Spacer(
+        modifier
+            .fillMaxSize()
+            .graphicsLayer()
+            .drawBehind {
+                val gridLines = gridLinesProvider()
+                if (gridLines.isEmpty()) return@drawBehind
+                withTransform(transformBlock) {
+                    gridLines.forEach { (start, end) ->
+                        drawLine(
+                            color = gridLinesColor,
+                            start = Offset(start.first, start.second),
+                            end = Offset(end.first, end.second),
+                            strokeWidth = 1f
+                        )
+                    }
+                }
+            }
+    )
+}
+
+@Composable
+fun ElementsCanvas(
+    drawsProvider: () -> List<BasicDrawWithBitmap>,
+    modifier: Modifier = Modifier,
+    transformBlock: DrawTransform.() -> Unit,
+) {
+    Spacer(
+        modifier
+            .fillMaxSize()
+            .graphicsLayer()      // own render layer, isolates invalidation
+            .drawBehind {
+                withTransform(transformBlock) {
+                    drawsProvider().forEach { draw ->
                         when (draw.elementDraw) {
                             is FixtureElementDraw -> {
                                 val w = draw.bitmap.width
@@ -206,19 +442,16 @@ fun DofusMap() {
                                     draw.elementDraw.color.getA()
                                 )
 
-                                // AS3: (fixture.offset.x + CELL_HALF_WIDTH) + halfWidth, (fixture.offset.y + CELL_HEIGHT) + halfHeight
-                                // assuming elementDraw.x/y already include the cell constants like your other elements
                                 val posX = draw.elementDraw.x + halfW
                                 val posY = draw.elementDraw.y + halfH
 
                                 withTransform({
-                                    // written in REVERSE of the AS3 matrix order:
                                     translate(
                                         posX,
                                         posY
-                                    )                                  // AS3 last:  translate(final pos)
+                                    )
                                     rotate(
-                                        degrees = draw.elementDraw.rotation / 100f,        // degrees, no PI/180
+                                        degrees = draw.elementDraw.rotation / 100f,
                                         pivot = Offset.Zero
                                     )
                                     scale(
@@ -229,11 +462,11 @@ fun DofusMap() {
                                     translate(
                                         -halfW,
                                         -halfH
-                                    )                              // AS3 first: translate(-half)
+                                    )
                                 }) {
                                     drawImage(
                                         image = draw.bitmap,
-                                        dstOffset = IntOffset.Zero,                        // position lives in the transform
+                                        dstOffset = IntOffset.Zero,
                                         dstSize = IntSize(w, h),
                                         colorFilter = colorFilter
                                     )
@@ -283,37 +516,7 @@ fun DofusMap() {
                     }
                 }
             }
-        }
-
-        InfoWatcher(
-            pointer = pointer,
-            originX = marginX + cellWidth / 2f,
-            originY = marginY + cellHeight / 2f,
-            cellWidth = cellWidth.toFloat(),
-            cellHeight = cellHeight.toFloat(),
-            timeToRender = timeToRender,
-            serverOk = serverOk,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(8.dp)
-        )
-
-        /*MapInfoPanel(
-            mapState = mapState,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(8.dp)
-        )
-
-        MapController(
-            mapState = mapState,
-            currentMapId = currentMapId,
-            onNavigate = { currentMapId = it },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp)
-        ) */
-    }
+    )
 }
 
 @Composable
@@ -365,49 +568,12 @@ fun InfoWatcher(
 }
 
 @Composable
-fun MapInfoPanel(
-    mapState: MapState,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp)
-    ) {
-        when (mapState) {
-            is MapState.Loading -> Text("map: loading...", color = Color.White, fontSize = 12.sp)
-            is MapState.Error -> Text("map: ${mapState.message}", color = Color(0xFFFF8787), fontSize = 12.sp)
-            is MapState.Ready -> {
-                val d2p = mapState.info.d2p
-                InfoLine("id", d2p.id.toString())
-                InfoLine("subarea", d2p.subareaId.toString())
-                InfoLine("type", d2p.mapType.toString())
-                InfoLine("layers", d2p.layers.size.toString())
-                InfoLine("elements", mapState.info.elements.size.toString())
-                InfoLine("gfx", mapState.info.elementsGfx.size.toString())
-                InfoLine("bg / fg", "${d2p.background.size} / ${d2p.foreground.size}")
-            }
-        }
-    }
-}
-
-@Composable
-private fun InfoLine(label: String, value: String) {
-    Row {
-        Text("$label: ", color = Color.Gray, fontSize = 12.sp)
-        Text(value, color = Color.White, fontSize = 12.sp)
-    }
-}
-
-@Composable
 fun MapController(
-    mapState: MapState,
     currentMapId: UInt,
     onNavigate: (UInt) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var input by remember { mutableStateOf("") }
-    val neighbours = (mapState as? MapState.Ready)?.info?.d2p?.neighbours
 
     Column(
         modifier = modifier
@@ -418,15 +584,6 @@ fun MapController(
     ) {
         Text("map $currentMapId", color = Color.White, fontSize = 12.sp)
 
-        // neighbor cross
-        NeighborButton("↑", neighbours?.topId, onNavigate)
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            NeighborButton("←", neighbours?.leftId, onNavigate)
-            NeighborButton("→", neighbours?.rightId, onNavigate)
-        }
-        NeighborButton("↓", neighbours?.bottomId, onNavigate)
-
-        // direct map id input
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -447,22 +604,5 @@ fun MapController(
                 Text("Go", fontSize = 12.sp)
             }
         }
-    }
-}
-
-@Composable
-private fun NeighborButton(
-    label: String,
-    neighbourId: Int?,
-    onNavigate: (UInt) -> Unit
-) {
-    val valid = neighbourId != null && neighbourId > 0
-    Button(
-        onClick = { if (valid) onNavigate(neighbourId.toUInt()) },
-        enabled = valid,
-        contentPadding = PaddingValues(0.dp),
-        modifier = Modifier.size(36.dp)
-    ) {
-        Text(label, fontSize = 14.sp)
     }
 }

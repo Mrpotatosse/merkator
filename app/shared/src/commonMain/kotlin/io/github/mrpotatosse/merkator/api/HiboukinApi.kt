@@ -42,10 +42,9 @@ class HiboukinApi @OptIn(ExperimentalSerializationApi::class) constructor(
         }.body()
 
     /** GET /hiboukin/gfxs?ids=... — raw bytes */
-    suspend fun gfxs(ids: List<Int>, quality: Int = 80): MapGfxInformation =
+    suspend fun gfxs(ids: List<Int>): MapGfxInformation =
         client.get("$baseUrl/hiboukin/gfxs") {
             parameter("ids", ids.joinToString(","))
-            parameter("quality", quality)
         }.body()
 
     /** GET /hiboukin/draw/{id}?ground&decor&gfx */

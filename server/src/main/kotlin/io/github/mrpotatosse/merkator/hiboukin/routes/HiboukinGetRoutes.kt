@@ -51,14 +51,10 @@ fun Route.hiboukinGetRoutes() {
             .split(",")
             .map { it.trim().toInt() }
             .toIntArray().toList()
-        val quality = call.parameters["quality"]?.toInt() ?: 80
         call.respond(transaction {
-            val gfxs = WorldGfxEntity.findAllByGfxIdIn(gfxIds).mapValues { gfx ->
-                val image = Image.makeFromEncoded(gfx.value.data.bytes)
-                val data = image.encodeToData(EncodedImageFormat.WEBP, quality)!!
-                image.close()
-                data.bytes
-            }
+            val gfxs = WorldGfxEntity
+                .findAllByGfxIdIn(gfxIds)
+                .mapValues { gfx -> gfx.value.data.bytes }
 
             MapGfxInformation(gfxs)
         })
@@ -140,7 +136,7 @@ fun Route.hiboukinGetRoutes() {
                 )
             }
 
-            MapDrawInformation(listOf(backgrounds, *elements.toTypedArray(), foregrounds))
+            MapDrawInformation(map, listOf(backgrounds, *elements.toTypedArray(), foregrounds))
         })
     }
 

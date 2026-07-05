@@ -20,6 +20,8 @@ import org.jetbrains.exposed.v1.core.statements.api.ExposedBlob
 import org.jetbrains.exposed.v1.jdbc.batchInsert
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.skia.EncodedImageFormat
+import org.jetbrains.skia.Image
 import org.koin.ktor.ext.inject
 import java.nio.file.Path
 import java.util.stream.Collectors
@@ -47,6 +49,10 @@ fun Route.hiboukinParseRoutes() {
         val eleIndexes: MutableList<EleIndexesEntry>,
         val isJpgEntries: MutableList<Int>
     )
+
+    post("/hiboukin/transform") {
+
+    }
 
     post("/hiboukin") {
         val fs by inject<HiboukinFileService>()
@@ -106,13 +112,20 @@ fun Route.hiboukinParseRoutes() {
         transaction {
             hiboukinIndexes.d2pIndexes.chunked(chunkSize).forEach { chunk ->
                 D2pDataModel.batchInsert(chunk) {
+                    var bytes = Path.of(it.path)
+                        .extract(it.offset, it.size)
+                        .readBytes(it.size)
+
+                    if (it.key.endsWith(".png")) {
+                        val image = Image.makeFromEncoded(bytes)
+                        val data = image.encodeToData(EncodedImageFormat.WEBP)!!
+                        image.close()
+                        bytes = data.bytes
+                    }
+
                     this[D2pDataModel.path] = it.path
                     this[D2pDataModel.key] = it.key
-                    this[D2pDataModel.data] = ExposedBlob(
-                        Path.of(it.path)
-                            .extract(it.offset, it.size)
-                            .readBytes(it.size)
-                    )
+                    this[D2pDataModel.data] = ExposedBlob(bytes)
                 }
             }
         }

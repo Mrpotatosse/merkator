@@ -20,7 +20,8 @@ data class D2pMap(
     val background: MutableList<Fixture>,
     val foreground: MutableList<Fixture>,
     val groundCRC: Int,
-    val layers: MutableList<Layer>
+    val layers: MutableList<Layer>,
+    val cells: MutableList<CellData>
 )
 
 @Serializable
@@ -106,3 +107,28 @@ data class SoundElement(
     val minDelayBetweenLoops: Short,
     val maxDelayBetweenLoops: Short
 ) : BasicElement()
+
+@Serializable
+data class CellData(
+    val id: Int,
+    val speed: Int,
+    val mapChangeData: UInt,
+    val moveZone: UInt,
+    val losmov: Int,
+    val floor: Int,
+    val arrow: Int,
+    val linkedZone: Int,
+    val mov: Boolean,
+    val los: Boolean,
+    val nonWalkableDuringFight: Boolean,
+    val red: Boolean,
+    val blue: Boolean,
+    val farmCell: Boolean,
+    val havenbagCell: Boolean,
+    val visible: Boolean,
+    val nonWalkableDuringRP: Boolean,
+    val topArrow: Boolean,
+    val rightArrow: Boolean,
+    val bottomArrow: Boolean,
+    val leftArrow: Boolean,
+)

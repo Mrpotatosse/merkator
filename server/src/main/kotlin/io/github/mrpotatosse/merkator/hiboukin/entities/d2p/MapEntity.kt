@@ -2,6 +2,7 @@ package io.github.mrpotatosse.merkator.hiboukin.entities.d2p
 
 import io.github.mrpotatosse.merkator.const.CellHalfHeight
 import io.github.mrpotatosse.merkator.const.CellHalfWidth
+import io.github.mrpotatosse.merkator.const.MapCellsCount
 import io.github.mrpotatosse.merkator.enumerations.ElementTypeEnum
 import io.github.mrpotatosse.merkator.enumerations.MapTypeEnum
 import io.github.mrpotatosse.merkator.extensions.*
@@ -98,6 +99,7 @@ class MapEntity(id: EntityID<Long>) : D2pDataEntity(id) {
         decryptedBuffer.readInt()
         val groundCRC = decryptedBuffer.readInt()
         val layers = getLayers(decryptedBuffer, mapVersion)
+        val cells = getCells(decryptedBuffer, mapVersion)
 
         return D2pMap(
             mapVersion,
@@ -124,7 +126,8 @@ class MapEntity(id: EntityID<Long>) : D2pDataEntity(id) {
             background,
             foreground,
             groundCRC,
-            layers
+            layers,
+            cells
         )
     }
 
@@ -274,5 +277,124 @@ class MapEntity(id: EntityID<Long>) : D2pDataEntity(id) {
                 )
             }
         }
+    }
+
+    private fun getCells(buffer: ByteBuffer, mapVersion: Byte): MutableList<CellData> {
+        val result = mutableListOf<CellData>()
+
+        val count = MapCellsCount
+        repeat(count) {
+            result.add(getCellData(buffer, mapVersion, it) ?: return@repeat)
+        }
+
+        return result
+    }
+
+    private fun getCellData(buffer: ByteBuffer, mapVersion: Byte, id: Int): CellData? {
+        val floor = buffer.readByte() * 10
+        if (floor == -1280) {
+            return null
+        }
+
+        var losmov = 3
+        var arrow = 0
+        var linkedZone = 0
+        var havenbagCell = false
+
+        val mov: Boolean
+        val los: Boolean
+        val nonWalkableDuringFight: Boolean
+        val nonWalkableDuringRP: Boolean
+        val red: Boolean
+        val blue: Boolean
+        val farmCell: Boolean
+        val visible: Boolean
+
+        val topArrow: Boolean
+        val bottomArrow: Boolean
+        val rightArrow: Boolean
+        val leftArrow: Boolean
+
+        if (mapVersion >= 9) {
+            val tmp = buffer.short.toInt()
+            mov = (tmp and 1) == 0
+            nonWalkableDuringFight = (tmp and 2) != 0
+            nonWalkableDuringRP = (tmp and 4) != 0
+            los = (tmp and 8) == 0
+            blue = (tmp and 0x10) != 0
+            red = (tmp and 0x20) != 0
+            visible = (tmp and 0x40) != 0
+            farmCell = (tmp and 0x80) != 0
+            if (mapVersion >= 10) {
+                havenbagCell = (tmp and 0x0100) != 0
+                topArrow = (tmp and 0x0200) != 0
+                bottomArrow = (tmp and 0x0400) != 0
+                rightArrow = (tmp and 0x0800) != 0
+                leftArrow = (tmp and 0x1000) != 0
+            } else {
+                topArrow = (tmp and 0x0100) != 0
+                bottomArrow = (tmp and 0x0200) != 0
+                rightArrow = (tmp and 0x0400) != 0
+                leftArrow = (tmp and 0x0800) != 0
+            }
+        } else {
+            losmov = buffer.readByte().toInt() and 0xFF
+            los = (losmov and 2) shr 1 == 1
+            mov = (losmov and 1) == 1
+            visible = (losmov and 0x40) shr 6 == 1
+            farmCell = (losmov and 0x20) shr 5 == 1
+            blue = (losmov and 0x10) shr 4 == 1
+            red = (losmov and 8) shr 3 == 1
+            nonWalkableDuringRP = (losmov and 0x80) shr 7 == 1
+            nonWalkableDuringFight = (losmov and 4) shr 2 == 1
+
+            topArrow = false
+            bottomArrow = false
+            rightArrow = false
+            leftArrow = false
+        }
+
+        val speed = buffer.readByte().toInt()
+        val mapChangeData = (buffer.readByte().toInt() and 0xFF).toUInt()
+
+        var moveZone = 0u
+        if (mapVersion > 5) {
+            moveZone = (buffer.readByte().toInt() and 0xFF).toUInt()
+        }
+
+        val hasLinkedZoneRP = mov && !farmCell
+        val hasLinkedZoneFight = mov && !nonWalkableDuringFight
+        if (mapVersion > 10 && (hasLinkedZoneRP || hasLinkedZoneFight)) {
+            linkedZone = buffer.readByte().toInt() and 0xFF
+        }
+
+        if (mapVersion in 8..8) {
+            val tmpBits = buffer.readByte().toInt()
+            arrow = 0x0F and tmpBits
+        }
+
+        return CellData(
+            id,
+            speed,
+            mapChangeData,
+            moveZone,
+            losmov,
+            floor,
+            arrow,
+            linkedZone,
+            mov,
+            los,
+            nonWalkableDuringFight,
+            red,
+            blue,
+            farmCell,
+            havenbagCell,
+            visible,
+            nonWalkableDuringRP,
+            topArrow,
+            rightArrow,
+            bottomArrow,
+            leftArrow,
+        )
     }
 }

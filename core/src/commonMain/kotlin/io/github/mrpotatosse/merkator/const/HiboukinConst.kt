@@ -15,4 +15,6 @@ const val MapRatio = 16.0 / 9.0
 const val CanvasHeight = 1024
 const val CanvasWidth = (CanvasHeight * MapRatio).toFloat()
 
+const val MapCellsCount = MapWidth * MapHeight * 2
+
 

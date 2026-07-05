@@ -18,3 +18,11 @@ data class BaseColor(
         fun clamp(value: Float, min: Float, max: Float): Float = value.coerceIn(min, max)
     }
 }
+
+@Serializable
+data class BaseARGB(
+    val alpha: Int,
+    val red: Int,
+    val green: Int,
+    val blue: Int,
+)

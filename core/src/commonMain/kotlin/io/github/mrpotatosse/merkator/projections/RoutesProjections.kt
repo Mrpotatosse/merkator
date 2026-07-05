@@ -11,6 +11,7 @@ data class MapInformation(
 
 @Serializable
 data class MapDrawInformation(
+    val d2p: D2pMap,
     val elements: List<List<BasicDraw>>
 )
 
