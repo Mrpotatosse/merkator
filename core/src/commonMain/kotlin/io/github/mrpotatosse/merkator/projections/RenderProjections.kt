@@ -36,6 +36,9 @@ data class GraphicalElementDraw(
     val width: Int,
     val height: Int,
     val flipped: Boolean,
+    val r: Float,
+    val g: Float,
+    val b: Float,
 ) : BasicDraw()
 
 @Serializable
@@ -46,5 +49,5 @@ data class FixtureElementDraw(
     val y: Float,
     val rotation: Short,
     val scale: BasePoint,
-    val color: FixtureColor
+    val color: FixtureColor,
 ) : BasicDraw()

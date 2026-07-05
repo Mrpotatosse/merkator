@@ -92,6 +92,10 @@ fun Route.hiboukinGetRoutes() {
                 elements.map { element ->
                     val normal = normalElements[element.elementId.toInt()] ?: return@map null
 
+                    val r = BaseColor.clamp((element.hue.red + element.shadow.red + 128f) * 2f, 0f, 512f)
+                    val g = BaseColor.clamp((element.hue.green + element.shadow.green + 128f) * 2f, 0f, 512f)
+                    val b = BaseColor.clamp((element.hue.blue + element.shadow.blue + 128f) * 2f, 0f, 512f)
+
                     val col = element.cellId % MapWidth
                     val row = element.cellId / MapWidth
                     val cellX = col * CellWidth + if (row % 2 == 1) CellHalfWidth.toDouble() else 0.0
@@ -107,6 +111,9 @@ fun Route.hiboukinGetRoutes() {
                         width = normal.size.x.toInt(),
                         height = normal.size.y.toInt(),
                         flipped = normal.horizontalSymmetry,
+                        r = r / 255f,
+                        g = g / 255f,
+                        b = b / 255f,
                     )
                 }.filterNotNull()
             }

@@ -29,6 +29,7 @@ import io.github.mrpotatosse.merkator.api.HiboukinApi
 import io.github.mrpotatosse.merkator.projections.*
 import io.github.mrpotatosse.merkator.utils.getIsoGridLines
 import io.github.mrpotatosse.merkator.utils.screenToWorld
+import io.github.mrpotatosse.merkator.utils.tintFilter
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -198,6 +199,12 @@ fun DofusMap() {
                                 val h = draw.bitmap.height
                                 val halfW = w * 0.5f
                                 val halfH = h * 0.5f
+                                val colorFilter = tintFilter(
+                                    draw.elementDraw.color.getR(),
+                                    draw.elementDraw.color.getG(),
+                                    draw.elementDraw.color.getB(),
+                                    draw.elementDraw.color.getA()
+                                )
 
                                 // AS3: (fixture.offset.x + CELL_HALF_WIDTH) + halfWidth, (fixture.offset.y + CELL_HEIGHT) + halfHeight
                                 // assuming elementDraw.x/y already include the cell constants like your other elements
@@ -227,7 +234,8 @@ fun DofusMap() {
                                     drawImage(
                                         image = draw.bitmap,
                                         dstOffset = IntOffset.Zero,                        // position lives in the transform
-                                        dstSize = IntSize(w, h)
+                                        dstSize = IntSize(w, h),
+                                        colorFilter = colorFilter
                                     )
                                 }
                             }
@@ -241,6 +249,11 @@ fun DofusMap() {
                                     draw.elementDraw.x.toInt(),
                                     draw.elementDraw.y.toInt()
                                 )
+                                val colorFilter = tintFilter(
+                                    draw.elementDraw.r,
+                                    draw.elementDraw.g,
+                                    draw.elementDraw.b
+                                )
 
                                 if (draw.elementDraw.flipped) {
                                     withTransform({
@@ -253,14 +266,16 @@ fun DofusMap() {
                                         drawImage(
                                             image = draw.bitmap,
                                             dstSize = size,
-                                            dstOffset = offset
+                                            dstOffset = offset,
+                                            colorFilter = colorFilter
                                         )
                                     }
                                 } else {
                                     drawImage(
                                         image = draw.bitmap,
                                         dstSize = size,
-                                        dstOffset = offset
+                                        dstOffset = offset,
+                                        colorFilter = colorFilter
                                     )
                                 }
                             }

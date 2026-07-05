@@ -50,7 +50,12 @@ data class MapZoom(
 data class FixtureColor(
     val color: BaseColor,
     val alpha: UByte
-)
+) {
+    fun getR() = (color.red / 127f + 1f).coerceIn(0f, 1f)
+    fun getG() = (color.green / 127f + 1f).coerceIn(0f, 1f)
+    fun getB() = (color.blue / 127f + 1f).coerceIn(0f, 1f)
+    fun getA() = (alpha.toFloat() / 255f).coerceIn(0f, 1f)
+}
 
 @Serializable
 data class Fixture(
