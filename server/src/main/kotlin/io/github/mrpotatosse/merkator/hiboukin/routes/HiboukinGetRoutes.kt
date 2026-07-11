@@ -52,11 +52,10 @@ fun Route.hiboukinGetRoutes() {
             .map { it.trim().toInt() }
             .toIntArray().toList()
         call.respond(transaction {
-            val gfxs = WorldGfxEntity
-                .findAllByGfxIdIn(gfxIds)
-                .mapValues { gfx -> gfx.value.data.bytes }
-
-            MapGfxInformation(gfxs)
+            MapGfxInformation(
+                WorldGfxEntity
+                    .findAllByGfxIdIn(gfxIds)
+                    .mapValues { gfx -> gfx.value.data.bytes })
         })
     }
 
@@ -172,41 +171,4 @@ fun Route.hiboukinGetRoutes() {
             )
         })
     }
-
-    /* get("/hiboukin/map/{id}/render") {
-        val mapId = call.parameters.getOrFail("id").toUInt()
-        val withGround = call.queryParameters["ground"]?.toBoolean() ?: true
-        val withDecor = call.queryParameters["decor"]?.toBoolean() ?: true
-        val gridLayer = call.queryParameters["gridLayer"]?.toInt() ?: 100
-
-        val startCom = System.currentTimeMillis()
-        val (graphical, normals, gfx) = transaction {
-            val map = MapEntity
-                .findByMapId(mapId)
-                .getMap()
-
-            val graphicalElements = mapService
-                .elements(map, withGround, withDecor)
-
-            val normalElements = graphicalElements
-                .flatMap { elements ->
-                    NormalEntity
-                        .findAllByElementIdIn(elements.map { element -> element.elementId.toInt() })
-                        .map { normal -> normal.getData() }
-                }
-                .associateBy { it.id }
-
-            val elementsGfx = WorldGfxEntity
-                .findAllByGfxIdIn(normalElements.map { it.value.gfxId })
-                .mapValues { it.value.data.bytes }
-
-            Triple(graphicalElements, normalElements, elementsGfx)
-        }
-        exposedLogger.info("computing took ${System.currentTimeMillis() - startCom}ms")
-
-        val startRed = System.currentTimeMillis()
-        val imageBytes = mapService.render(graphical, normals, gfx, gridLayer)
-        exposedLogger.info("render took ${System.currentTimeMillis() - startRed}ms")
-        call.respond(imageBytes)
-    } */
 }

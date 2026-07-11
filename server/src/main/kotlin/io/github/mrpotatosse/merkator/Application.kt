@@ -6,6 +6,7 @@ import io.github.mrpotatosse.merkator.modules.merkatorModules
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.protobuf.*
 import io.ktor.server.application.*
+import io.ktor.server.http.content.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.contentnegotiation.*
@@ -41,7 +42,13 @@ fun Application.module() {
         modules(merkatorModules)
     }
     routing {
-        hiboukinParseRoutes()
-        hiboukinGetRoutes()
+        route("/api") {
+            hiboukinParseRoutes()
+            hiboukinGetRoutes()
+        }
+
+        staticResources("/", "static") {
+            default("index.html")
+        }
     }
 }

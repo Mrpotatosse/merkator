@@ -32,6 +32,15 @@ val skikoTarget = when ("${targetOs}-${targetArch}") {
     "windows-x64" -> libs.skiko.windows.x64
     else -> error("Unsupported target")
 }
+val copyWasmJsApp by tasks.registering(Copy::class) {
+    description = "Build the client into the server"
+    from(project(":app:webApp").tasks.named("wasmJsBrowserDevelopmentExecutableDistribution"))
+    into(layout.buildDirectory.dir("resources/main/static"))
+}
+
+tasks.named("processResources") {
+    dependsOn(copyWasmJsApp)
+}
 
 dependencies {
     api(projects.core)

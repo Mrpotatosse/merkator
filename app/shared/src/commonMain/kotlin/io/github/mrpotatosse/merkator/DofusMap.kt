@@ -1,5 +1,5 @@
 package io.github.mrpotatosse.merkator
-
+/*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -11,27 +11,33 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.isSpecified
-import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asComposeImageBitmap
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.mrpotatosse.merkator.api.HiboukinApi
+import io.github.mrpotatosse.merkator.components.game.ElementsCanvas
+import io.github.mrpotatosse.merkator.components.game.GridCanvas
 import io.github.mrpotatosse.merkator.const.CellHalfHeight
 import io.github.mrpotatosse.merkator.const.CellHalfWidth
 import io.github.mrpotatosse.merkator.const.MapWidth
-import io.github.mrpotatosse.merkator.projections.BasicDraw
+import io.github.mrpotatosse.merkator.models.game.BasicDrawWithBitmap
 import io.github.mrpotatosse.merkator.projections.FixtureElementDraw
 import io.github.mrpotatosse.merkator.projections.GraphicalElementDraw
 import io.github.mrpotatosse.merkator.projections.MapDrawInformation
-import io.github.mrpotatosse.merkator.utils.*
+import io.github.mrpotatosse.merkator.utils.game.drawMapCellFromCoords
+import io.github.mrpotatosse.merkator.utils.getIsoGridLines
+import io.github.mrpotatosse.merkator.utils.screenToWorld
+import io.github.mrpotatosse.merkator.utils.unpackArgb
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -46,35 +52,6 @@ sealed interface MapDrawState {
     data object Loading : MapDrawState
     data class Ready(val info: MapDrawInformation) : MapDrawState
     data class Error(val message: String) : MapDrawState
-}
-
-data class BasicDrawWithBitmap(
-    val elementDraw: BasicDraw,
-    val bitmap: ImageBitmap
-)
-
-fun DrawScope.drawMapCellFromCoord(
-    x: Float,
-    y: Float,
-    originX: Float,
-    originY: Float,
-    cellWidth: Float,
-    cellHeight: Float,
-    color: Color = Color.Gray,
-    style: DrawStyle = Stroke(width = 1f),
-) {
-    val (startX, startY) = worldToScreen(x, y, originX, originY, cellWidth, cellHeight)
-    val cellHalfWidth = cellWidth / 2.0f
-    val cellHalfHeight = cellHeight / 2.0f
-    // losange iso : les 4 sommets de la cellule
-    val path = Path().apply {
-        moveTo(startX + cellHalfWidth, startY)
-        lineTo(startX, startY + cellHalfHeight)
-        lineTo(startX - cellHalfWidth, startY)
-        lineTo(startX, startY - cellHalfHeight)       // bas
-        close()
-    }
-    drawPath(path, color, style = style)
 }
 
 @Composable
@@ -211,114 +188,6 @@ fun DofusMap() {
                         }
                     )
                 }
-                /* Canvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                ) {
-                    withTransform({
-                    }) {
-                        drawList.forEachIndexed { index, draws ->
-                            if ((index == 2) and withGrid) {
-                                lines.forEach { (start, end) ->
-                                    val baseColor = unpackArgb(state.info.d2p.color.grid)
-                                    drawLine(
-                                        color = Color(baseColor.red, baseColor.green, baseColor.blue, baseColor.alpha),
-                                        start = Offset(start.first, start.second),
-                                        end = Offset(end.first, end.second),
-                                        strokeWidth = 1f
-                                    )
-                                }
-                            }
-
-                            draws.forEach { draw ->
-                                when (draw.elementDraw) {
-                                    is FixtureElementDraw -> {
-                                        val w = draw.bitmap.width
-                                        val h = draw.bitmap.height
-                                        val halfW = w * 0.5f
-                                        val halfH = h * 0.5f
-                                        val colorFilter = tintFilter(
-                                            draw.elementDraw.color.getR(),
-                                            draw.elementDraw.color.getG(),
-                                            draw.elementDraw.color.getB(),
-                                            draw.elementDraw.color.getA()
-                                        )
-
-                                        val posX = draw.elementDraw.x + halfW
-                                        val posY = draw.elementDraw.y + halfH
-
-                                        withTransform({
-                                            translate(
-                                                posX,
-                                                posY
-                                            )
-                                            rotate(
-                                                degrees = draw.elementDraw.rotation / 100f,
-                                                pivot = Offset.Zero
-                                            )
-                                            scale(
-                                                draw.elementDraw.scale.x / 1000f,
-                                                draw.elementDraw.scale.y / 1000f,
-                                                pivot = Offset.Zero
-                                            )
-                                            translate(
-                                                -halfW,
-                                                -halfH
-                                            )
-                                        }) {
-                                            drawImage(
-                                                image = draw.bitmap,
-                                                dstOffset = IntOffset.Zero,
-                                                dstSize = IntSize(w, h),
-                                                colorFilter = colorFilter
-                                            )
-                                        }
-                                    }
-
-                                    is GraphicalElementDraw -> {
-                                        val size = IntSize(
-                                            draw.elementDraw.width,
-                                            draw.elementDraw.height
-                                        )
-                                        val offset = IntOffset(
-                                            draw.elementDraw.x.toInt(),
-                                            draw.elementDraw.y.toInt()
-                                        )
-                                        val colorFilter = tintFilter(
-                                            draw.elementDraw.r,
-                                            draw.elementDraw.g,
-                                            draw.elementDraw.b
-                                        )
-
-                                        if (draw.elementDraw.flipped) {
-                                            withTransform({
-                                                scale(
-                                                    -1f,
-                                                    1f,
-                                                    pivot = Offset(draw.elementDraw.x + draw.elementDraw.width / 2f, 0f)
-                                                )
-                                            }) {
-                                                drawImage(
-                                                    image = draw.bitmap,
-                                                    dstSize = size,
-                                                    dstOffset = offset,
-                                                    colorFilter = colorFilter
-                                                )
-                                            }
-                                        } else {
-                                            drawImage(
-                                                image = draw.bitmap,
-                                                dstSize = size,
-                                                dstOffset = offset,
-                                                colorFilter = colorFilter
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } */
 
                 Canvas(
                     modifier = Modifier
@@ -339,7 +208,7 @@ fun DofusMap() {
                         }
                 ) {
                     withTransform({ translate(marginX, marginY) }) {
-                        drawMapCellFromCoord(
+                        drawMapCellFromCoords(
                             mapCell.first, mapCell.second,
                             0f, 0f,
                             cellWidth.toFloat(), cellHeight.toFloat(),
@@ -349,7 +218,7 @@ fun DofusMap() {
 
                         state.info.d2p.cells.forEach { cell ->
                             if (!cell.mov)
-                                drawMapCellFromCoord(
+                                drawMapCellFromCoords(
                                     (cell.id % MapWidth).toFloat(), (cell.id / MapWidth).toFloat(),
                                     CellHalfWidth, CellHalfHeight,
                                     cellWidth.toFloat(), cellHeight.toFloat(),
@@ -386,137 +255,6 @@ fun DofusMap() {
             else -> {}
         }
     }
-}
-
-@Composable
-fun GridCanvas(
-    gridLinesProvider: () -> List<List<Pair<Float, Float>>>,
-    gridLinesColor: Color = Color.White,
-    transformBlock: DrawTransform.() -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Spacer(
-        modifier
-            .fillMaxSize()
-            .graphicsLayer()
-            .drawBehind {
-                val gridLines = gridLinesProvider()
-                if (gridLines.isEmpty()) return@drawBehind
-                withTransform(transformBlock) {
-                    gridLines.forEach { (start, end) ->
-                        drawLine(
-                            color = gridLinesColor,
-                            start = Offset(start.first, start.second),
-                            end = Offset(end.first, end.second),
-                            strokeWidth = 1f
-                        )
-                    }
-                }
-            }
-    )
-}
-
-@Composable
-fun ElementsCanvas(
-    drawsProvider: () -> List<BasicDrawWithBitmap>,
-    modifier: Modifier = Modifier,
-    transformBlock: DrawTransform.() -> Unit,
-) {
-    Spacer(
-        modifier
-            .fillMaxSize()
-            .graphicsLayer()      // own render layer, isolates invalidation
-            .drawBehind {
-                withTransform(transformBlock) {
-                    drawsProvider().forEach { draw ->
-                        when (draw.elementDraw) {
-                            is FixtureElementDraw -> {
-                                val w = draw.bitmap.width
-                                val h = draw.bitmap.height
-                                val halfW = w * 0.5f
-                                val halfH = h * 0.5f
-                                val colorFilter = tintFilter(
-                                    draw.elementDraw.color.getR(),
-                                    draw.elementDraw.color.getG(),
-                                    draw.elementDraw.color.getB(),
-                                    draw.elementDraw.color.getA()
-                                )
-
-                                val posX = draw.elementDraw.x + halfW
-                                val posY = draw.elementDraw.y + halfH
-
-                                withTransform({
-                                    translate(
-                                        posX,
-                                        posY
-                                    )
-                                    rotate(
-                                        degrees = draw.elementDraw.rotation / 100f,
-                                        pivot = Offset.Zero
-                                    )
-                                    scale(
-                                        draw.elementDraw.scale.x / 1000f,
-                                        draw.elementDraw.scale.y / 1000f,
-                                        pivot = Offset.Zero
-                                    )
-                                    translate(
-                                        -halfW,
-                                        -halfH
-                                    )
-                                }) {
-                                    drawImage(
-                                        image = draw.bitmap,
-                                        dstOffset = IntOffset.Zero,
-                                        dstSize = IntSize(w, h),
-                                        colorFilter = colorFilter
-                                    )
-                                }
-                            }
-
-                            is GraphicalElementDraw -> {
-                                val size = IntSize(
-                                    draw.elementDraw.width,
-                                    draw.elementDraw.height
-                                )
-                                val offset = IntOffset(
-                                    draw.elementDraw.x.toInt(),
-                                    draw.elementDraw.y.toInt()
-                                )
-                                val colorFilter = tintFilter(
-                                    draw.elementDraw.r,
-                                    draw.elementDraw.g,
-                                    draw.elementDraw.b
-                                )
-
-                                if (draw.elementDraw.flipped) {
-                                    withTransform({
-                                        scale(
-                                            -1f,
-                                            1f,
-                                            pivot = Offset(draw.elementDraw.x + draw.elementDraw.width / 2f, 0f)
-                                        )
-                                    }) {
-                                        drawImage(
-                                            image = draw.bitmap,
-                                            dstSize = size,
-                                            dstOffset = offset,
-                                            colorFilter = colorFilter
-                                        )
-                                    }
-                                } else {
-                                    drawImage(
-                                        image = draw.bitmap,
-                                        dstSize = size,
-                                        dstOffset = offset,
-                                        colorFilter = colorFilter
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-    )
 }
 
 @Composable
@@ -605,4 +343,4 @@ fun MapController(
             }
         }
     }
-}
+} */

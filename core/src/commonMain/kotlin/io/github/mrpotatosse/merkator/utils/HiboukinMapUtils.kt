@@ -1,5 +1,7 @@
 package io.github.mrpotatosse.merkator.utils
 
+import io.github.mrpotatosse.merkator.const.MapHeight
+import io.github.mrpotatosse.merkator.const.MapWidth
 import io.github.mrpotatosse.merkator.projections.BaseARGB
 
 fun mapIdToKey(id: UInt) = "${id % 10u}/$id.dlm"
@@ -19,3 +21,7 @@ fun unpackArgb(raw: Long) =
         ((raw shr 8) and 0xFF).toInt(),
         ((raw) and 0xFF).toInt()
     )
+
+fun cellIdOrNull(x: Int, y: Int): Int? =
+    if (x in 0 until MapWidth && y in 0 until MapHeight * 2) y * MapWidth + x
+    else null

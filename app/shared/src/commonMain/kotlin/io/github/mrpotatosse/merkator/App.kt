@@ -1,27 +1,22 @@
 package io.github.mrpotatosse.merkator
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.tooling.preview.Preview
+import io.github.mrpotatosse.merkator.utils.LocalLoadingBackground
+import io.github.mrpotatosse.merkator.views.game.DofusGame
+import merkator.app.shared.generated.resources.Res
+import merkator.app.shared.generated.resources.loading_background
+import org.jetbrains.compose.resources.painterResource
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 @Preview
 fun App() {
-    MaterialTheme {
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .safeContentPadding()
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            DofusMap()
-        }
+    val background = painterResource(Res.drawable.loading_background)
+    
+    CompositionLocalProvider(LocalLoadingBackground provides background) {
+        DofusGame()
     }
 }

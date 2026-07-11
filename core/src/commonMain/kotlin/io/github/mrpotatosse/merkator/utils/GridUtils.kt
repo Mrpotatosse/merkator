@@ -42,25 +42,50 @@ fun screenToWorld(
     return best
 }
 
+/**
+ * Builds the isometric grid outline as line segments, skipping cells for which
+ * [includeCell] returns false.
+ *
+ * Every kept cell contributes its four diamond edges to a set keyed on integer
+ * lattice coordinates (half-cell units), so:
+ *  - an edge shared by two kept cells is emitted exactly once,
+ *  - an edge between a kept and a skipped cell is still emitted (holes stay outlined),
+ *  - map borders need no special-casing anymore (the old l/t "fill" branches are gone).
+ *
+ * Screen positions still come from [worldToScreen]; the integer lattice is used
+ * only as a float-safe dedup key.
+ */
 fun getIsoGridLines(
     width: Int,
     height: Int,
     cellWidth: Int,
     cellHeight: Int,
     rawOriginX: Float = 0f,
-    rawOriginY: Float = 0f
+    rawOriginY: Float = 0f,
+    includeCell: (cellId: Int) -> Boolean = { true },
 ): List<List<Pair<Float, Float>>> {
     val cellHalfWidth = cellWidth / 2.0f
     val cellHalfHeight = cellHeight / 2.0f
     val originX = rawOriginX + cellHalfWidth
     val originY = rawOriginY + cellHalfHeight
 
-    // raw (unmerged) segments, each as a pair of endpoints
-    val segments = mutableListOf<Pair<Pair<Float, Float>, Pair<Float, Float>>>()
+    // corner key on the half-unit lattice -> exact screen position
+    val corners = HashMap<Long, Pair<Float, Float>>()
+    // canonical edge = (cornerKeyA, cornerKeyB) with A < B
+    val edges = LinkedHashSet<Pair<Long, Long>>()
+
+    fun key(u: Int, v: Int): Long = (u.toLong() shl 32) or (v.toLong() and 0xFFFFFFFFL)
+
+    fun addEdge(a: Long, b: Long) {
+        edges += if (a < b) a to b else b to a
+    }
 
     for (y in 0..<height * 2) {
         for (x in 0..<width) {
-            val (startX, startY) = worldToScreen(
+            val cellId = y * width + x
+            if (!includeCell(cellId)) continue
+
+            val (cx, cy) = worldToScreen(
                 x.toFloat(),
                 y.toFloat(),
                 originX,
@@ -69,22 +94,26 @@ fun getIsoGridLines(
                 cellHeight.toFloat()
             )
 
-            // l
-            segments += Pair(startX - cellHalfWidth, startY) to Pair(startX, startY - cellHalfHeight)
-            // t
-            segments += Pair(startX, startY - cellHalfHeight) to Pair(startX + cellHalfWidth, startY)
+            // corner lattice coords: center of cell (x, y) sits at u = 2x + y%2, v = y
+            val u = 2 * x + (y % 2)
+            val left = key(u - 1, y)
+            val top = key(u, y - 1)
+            val right = key(u + 1, y)
+            val bottom = key(u, y + 1)
 
-            if (((y % 2 == 1) and (x == width - 1)) or (y == (height * 2) - 1)) {
-                // l fill
-                segments += Pair(startX, startY + cellHalfHeight) to Pair(startX + cellHalfWidth, startY)
-            }
-            if (((y % 2 == 0) and (x == 0)) or (y == (height * 2) - 1)) {
-                // t fill
-                segments += Pair(startX - cellHalfWidth, startY) to Pair(startX, startY + cellHalfHeight)
-            }
+            corners[left] = Pair(cx - cellHalfWidth, cy)
+            corners[top] = Pair(cx, cy - cellHalfHeight)
+            corners[right] = Pair(cx + cellHalfWidth, cy)
+            corners[bottom] = Pair(cx, cy + cellHalfHeight)
+
+            addEdge(left, top)      // l
+            addEdge(top, right)     // t
+            addEdge(right, bottom)  // b (was implicit via neighbour's l / border fill)
+            addEdge(bottom, left)   // r (was implicit via neighbour's t / border fill)
         }
     }
 
+    val segments = edges.map { (a, b) -> corners.getValue(a) to corners.getValue(b) }
     return mergeCollinearSegments(segments)
 }
 

@@ -50,10 +50,6 @@ fun Route.hiboukinParseRoutes() {
         val isJpgEntries: MutableList<Int>
     )
 
-    post("/hiboukin/transform") {
-
-    }
-
     post("/hiboukin") {
         val fs by inject<HiboukinFileService>()
         val frs by inject<HiboukinFileReaderService>()
